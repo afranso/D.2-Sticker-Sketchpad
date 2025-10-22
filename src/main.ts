@@ -10,12 +10,14 @@ document.body.innerHTML = `
 const canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
 const context = canvas.getContext("2d")!;
 
-let drawing: { x: number; y: number }[][] = [];
+let drawing: { x: number; y: number }[][] = []; // visible strokes
+let redoStack: { x: number; y: number }[][] = []; // undone strokes
 let currentStroke: { x: number; y: number }[] | null = null;
 
 canvas.addEventListener("mousedown", (e) => {
   currentStroke = [{ x: e.offsetX, y: e.offsetY }];
   drawing.push(currentStroke);
+  redoStack = [];
   canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
@@ -30,11 +32,9 @@ canvas.addEventListener("mouseup", () => {
   currentStroke = null;
 });
 
-
 canvas.addEventListener("drawing-changed", () => {
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  
   for (const stroke of drawing) {
     if (stroke.length < 2) continue;
     context.beginPath();
@@ -49,11 +49,39 @@ canvas.addEventListener("drawing-changed", () => {
   }
 });
 
+const buttonBar = document.createElement("div");
+buttonBar.style.marginTop = "1em";
+
 const clearButton = document.createElement("button");
-clearButton.innerHTML = "clear";
-document.body.append(clearButton);
+clearButton.textContent = "Clear";
+
+const undoButton = document.createElement("button");
+undoButton.textContent = "Undo";
+
+const redoButton = document.createElement("button");
+redoButton.textContent = "Redo";
+
+buttonBar.append(clearButton, undoButton, redoButton);
+document.body.append(buttonBar);
 
 clearButton.addEventListener("click", () => {
   drawing = [];
+  redoStack = [];
   context.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+undoButton.addEventListener("click", () => {
+  if (drawing.length > 0) {
+    const lastStroke = drawing.pop()!;
+    redoStack.push(lastStroke);
+    canvas.dispatchEvent(new Event("drawing-changed"));
+  }
+});
+
+redoButton.addEventListener("click", () => {
+  if (redoStack.length > 0) {
+    const stroke = redoStack.pop()!;
+    drawing.push(stroke);
+    canvas.dispatchEvent(new Event("drawing-changed"));
+  }
 });
