@@ -2,50 +2,65 @@ import exampleIconUrl from "./noun-paperclip-7598668-00449F.png";
 import "./style.css";
 
 document.body.innerHTML = `
-<h1>Sticker Sketchpad</h1>
+  <h1>Sticker Sketchpad</h1>
   <canvas id="myCanvas" width="256" height="256"></canvas>
   <p>Example image asset: <img src="${exampleIconUrl}" class="icon" /></p>
 `;
 
+class MarkerLine {
+  points: { x: number; y: number }[] = [];
+
+  constructor(x: number, y: number) {
+    this.points.push({ x, y });
+  }
+
+  drag(x: number, y: number) {
+    this.points.push({ x, y });
+  }
+
+  display(ctx: CanvasRenderingContext2D) {
+    if (this.points.length < 2) return;
+    ctx.beginPath();
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1;
+    ctx.moveTo(this.points[0].x, this.points[0].y);
+    for (let i = 1; i < this.points.length; i++) {
+      ctx.lineTo(this.points[i].x, this.points[i].y);
+    }
+    ctx.stroke();
+    ctx.closePath();
+  }
+}
+
 const canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
 const context = canvas.getContext("2d")!;
 
-let drawing: { x: number; y: number }[][] = []; // visible strokes
-let redoStack: { x: number; y: number }[][] = []; // undone strokes
-let currentStroke: { x: number; y: number }[] | null = null;
+let drawing: MarkerLine[] = [];
+let redoStack: MarkerLine[] = [];
+let currentLine: MarkerLine | null = null;
 
 canvas.addEventListener("mousedown", (e) => {
-  currentStroke = [{ x: e.offsetX, y: e.offsetY }];
-  drawing.push(currentStroke);
+  currentLine = new MarkerLine(e.offsetX, e.offsetY);
+  drawing.push(currentLine);
   redoStack = [];
   canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (currentStroke) {
-    currentStroke.push({ x: e.offsetX, y: e.offsetY });
+  if (currentLine) {
+    currentLine.drag(e.offsetX, e.offsetY);
     canvas.dispatchEvent(new Event("drawing-changed"));
   }
 });
 
 canvas.addEventListener("mouseup", () => {
-  currentStroke = null;
+  currentLine = null;
 });
 
 canvas.addEventListener("drawing-changed", () => {
   context.clearRect(0, 0, canvas.width, canvas.height);
-
-  for (const stroke of drawing) {
-    if (stroke.length < 2) continue;
-    context.beginPath();
-    context.strokeStyle = "black";
-    context.lineWidth = 1;
-    context.moveTo(stroke[0].x, stroke[0].y);
-    for (let i = 1; i < stroke.length; i++) {
-      context.lineTo(stroke[i].x, stroke[i].y);
-    }
-    context.stroke();
-    context.closePath();
+  for (const line of drawing) {
+    line.display(context);
   }
 });
 
@@ -72,16 +87,16 @@ clearButton.addEventListener("click", () => {
 
 undoButton.addEventListener("click", () => {
   if (drawing.length > 0) {
-    const lastStroke = drawing.pop()!;
-    redoStack.push(lastStroke);
+    const last = drawing.pop()!;
+    redoStack.push(last);
     canvas.dispatchEvent(new Event("drawing-changed"));
   }
 });
 
 redoButton.addEventListener("click", () => {
   if (redoStack.length > 0) {
-    const stroke = redoStack.pop()!;
-    drawing.push(stroke);
+    const restored = redoStack.pop()!;
+    drawing.push(restored);
     canvas.dispatchEvent(new Event("drawing-changed"));
   }
 });
