@@ -4,13 +4,19 @@ import "./style.css";
 document.body.innerHTML = `
   <h1>Sticker Sketchpad</h1>
   <canvas id="myCanvas" width="256" height="256"></canvas>
+  <div id="tools">
+    <button id="thin">Thin Marker</button>
+    <button id="thick">Thick Marker</button>
+  </div>
   <p>Example image asset: <img src="${exampleIconUrl}" class="icon" /></p>
 `;
 
 class MarkerLine {
   points: { x: number; y: number }[] = [];
+  thickness: number;
 
-  constructor(x: number, y: number) {
+  constructor(x: number, y: number, thickness: number) {
+    this.thickness = thickness;
     this.points.push({ x, y });
   }
 
@@ -22,7 +28,7 @@ class MarkerLine {
     if (this.points.length < 2) return;
     ctx.beginPath();
     ctx.strokeStyle = "black";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = this.thickness;
     ctx.moveTo(this.points[0].x, this.points[0].y);
     for (let i = 1; i < this.points.length; i++) {
       ctx.lineTo(this.points[i].x, this.points[i].y);
@@ -38,9 +44,25 @@ const context = canvas.getContext("2d")!;
 let drawing: MarkerLine[] = [];
 let redoStack: MarkerLine[] = [];
 let currentLine: MarkerLine | null = null;
+let currentThickness = 1;
+
+const thinButton = document.getElementById("thin")!;
+const thickButton = document.getElementById("thick")!;
+
+function setTool(thickness: number, button: HTMLElement) {
+  currentThickness = thickness;
+  document.querySelectorAll("#tools button").forEach((b) =>
+    b.classList.remove("selectedTool")
+  );
+  button.classList.add("selectedTool");
+}
+
+thinButton.addEventListener("click", () => setTool(1, thinButton));
+thickButton.addEventListener("click", () => setTool(5, thickButton));
+setTool(1, thinButton);
 
 canvas.addEventListener("mousedown", (e) => {
-  currentLine = new MarkerLine(e.offsetX, e.offsetY);
+  currentLine = new MarkerLine(e.offsetX, e.offsetY, currentThickness);
   drawing.push(currentLine);
   redoStack = [];
   canvas.dispatchEvent(new Event("drawing-changed"));
