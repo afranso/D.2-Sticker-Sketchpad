@@ -32,7 +32,25 @@ addStickerButton.id = "addSticker";
 addStickerButton.type = "button";
 addStickerButton.textContent = "➕ Custom Sticker";
 
-tools.append(thinButton, thickButton, stickerButtonsDiv, addStickerButton);
+const hueLabel = document.createElement("label");
+hueLabel.textContent = "🎨 Color Hue:";
+hueLabel.htmlFor = "hueSlider";
+
+const hueSlider = document.createElement("input");
+hueSlider.type = "range";
+hueSlider.min = "0";
+hueSlider.max = "360";
+hueSlider.value = "0";
+hueSlider.id = "hueSlider";
+
+tools.append(
+  thinButton,
+  thickButton,
+  stickerButtonsDiv,
+  addStickerButton,
+  hueLabel,
+  hueSlider,
+);
 
 const exampleP = document.createElement("p");
 exampleP.innerText = "Example image asset: ";
@@ -53,8 +71,10 @@ interface Draggable {
 class MarkerLine implements Drawable, Draggable {
   private readonly points: { x: number; y: number }[];
   private readonly thickness: number;
-  constructor(x: number, y: number, thickness: number) {
+  private readonly color: string;
+  constructor(x: number, y: number, thickness: number, color: string) {
     this.thickness = thickness;
+    this.color = color;
     this.points = [{ x, y }];
   }
   drag(x: number, y: number): void {
@@ -63,7 +83,7 @@ class MarkerLine implements Drawable, Draggable {
   display(ctx: CanvasRenderingContext2D): void {
     if (this.points.length < 2) return;
     ctx.beginPath();
-    ctx.strokeStyle = "black";
+    ctx.strokeStyle = this.color;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.lineWidth = this.thickness;
@@ -81,10 +101,11 @@ class ToolPreview implements Drawable {
     private readonly x: number,
     private readonly y: number,
     private readonly thickness: number,
+    private readonly color: string,
   ) {}
   display(ctx: CanvasRenderingContext2D): void {
     ctx.beginPath();
-    ctx.strokeStyle = "gray";
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 1;
     ctx.arc(this.x, this.y, this.thickness / 2, 0, Math.PI * 2);
     ctx.stroke();
@@ -143,6 +164,7 @@ let toolPreview: Preview | null = null;
 let currentTool: "thin" | "thick" | "sticker" = "thin";
 let currentThickness = 2.5;
 let currentSticker = "";
+let currentHue = 0;
 
 const availableStickers: string[] = ["🎨", "🐾", "🌈", "⭐", "✨"];
 
@@ -193,9 +215,20 @@ addStickerButton.addEventListener("click", () => {
   renderStickerButtons();
 });
 
+hueSlider.addEventListener("input", () => {
+  currentHue = parseInt(hueSlider.value, 10);
+  canvas.dispatchEvent(new Event("tool-moved"));
+});
+
 canvas.addEventListener("mousedown", (ev) => {
+  const color = `hsl(${currentHue}, 100%, 30%)`;
   if (currentTool === "thin" || currentTool === "thick") {
-    currentCommand = new MarkerLine(ev.offsetX, ev.offsetY, currentThickness);
+    currentCommand = new MarkerLine(
+      ev.offsetX,
+      ev.offsetY,
+      currentThickness,
+      color,
+    );
   } else if (currentTool === "sticker" && currentSticker) {
     currentCommand = new StickerCommand(ev.offsetX, ev.offsetY, currentSticker);
   }
@@ -213,8 +246,14 @@ canvas.addEventListener("mousemove", (ev) => {
     canvas.dispatchEvent(new Event("drawing-changed"));
     return;
   }
+  const color = `hsl(${currentHue}, 100%, 30%)`;
   if (currentTool === "thin" || currentTool === "thick") {
-    toolPreview = new ToolPreview(ev.offsetX, ev.offsetY, currentThickness);
+    toolPreview = new ToolPreview(
+      ev.offsetX,
+      ev.offsetY,
+      currentThickness,
+      color,
+    );
   } else if (currentTool === "sticker" && currentSticker) {
     toolPreview = new StickerPreview(ev.offsetX, ev.offsetY, currentSticker);
   } else {
