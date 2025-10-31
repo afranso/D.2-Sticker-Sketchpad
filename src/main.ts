@@ -276,7 +276,12 @@ const redoButton = document.createElement("button");
 redoButton.type = "button";
 redoButton.textContent = "Redo";
 
-buttonBar.append(clearButton, undoButton, redoButton);
+// ✅ NEW: Export button
+const exportButton = document.createElement("button");
+exportButton.type = "button";
+exportButton.textContent = "Export PNG";
+
+buttonBar.append(clearButton, undoButton, redoButton, exportButton);
 document.body.append(buttonBar);
 
 clearButton.addEventListener("click", () => {
@@ -295,4 +300,24 @@ redoButton.addEventListener("click", () => {
   const restored = redoStack.pop();
   if (restored) drawing.push(restored);
   canvas.dispatchEvent(new Event("drawing-changed"));
+});
+
+// ✅ --- High-resolution Export ---
+exportButton.addEventListener("click", () => {
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = 1024;
+  exportCanvas.height = 1024;
+
+  const exportCtx = get2DContext(exportCanvas);
+  exportCtx.scale(4, 4); // upscale by 4×
+
+  // Draw all commands (not previews)
+  for (const cmd of drawing) cmd.display(exportCtx);
+
+  // Export to PNG file
+  const dataURL = exportCanvas.toDataURL("image/png");
+  const link = document.createElement("a");
+  link.href = dataURL;
+  link.download = "sketchpad_export.png";
+  link.click();
 });
