@@ -1,19 +1,50 @@
 import exampleIconUrl from "./noun-paperclip-7598668-00449F.png";
 import "./style.css";
 
-document.body.innerHTML = `
-  <h1>Sticker Sketchpad</h1>
-  <canvas id="myCanvas" width="256" height="256"></canvas>
-  <div id="tools">
-    <button id="thin">Thin Marker</button>
-    <button id="thick">Thick Marker</button>
-    <button id="sticker1">😀</button>
-    <button id="sticker2">🌸</button>
-    <button id="sticker3">🚀</button>
-  </div>
-  <p>Example image asset: <img src="${exampleIconUrl}" class="icon" /></p>
-`;
+export {}; // ensure module scope
 
+// --- DOM setup ---
+const title = document.createElement("h1");
+title.textContent = "Sticker Sketchpad";
+
+const canvas = document.createElement("canvas");
+canvas.id = "myCanvas";
+canvas.width = 256;
+canvas.height = 256;
+
+const tools = document.createElement("div");
+tools.id = "tools";
+
+const thinButton = document.createElement("button");
+thinButton.id = "thin";
+thinButton.type = "button";
+thinButton.textContent = "Thin Marker";
+
+const thickButton = document.createElement("button");
+thickButton.id = "thick";
+thickButton.type = "button";
+thickButton.textContent = "Thick Marker";
+
+const stickerButtonsDiv = document.createElement("div");
+stickerButtonsDiv.id = "stickerButtons";
+
+const addStickerButton = document.createElement("button");
+addStickerButton.id = "addSticker";
+addStickerButton.type = "button";
+addStickerButton.textContent = "➕ Custom Sticker";
+
+tools.append(thinButton, thickButton, stickerButtonsDiv, addStickerButton);
+
+const exampleP = document.createElement("p");
+exampleP.innerText = "Example image asset: ";
+const exampleImg = document.createElement("img");
+exampleImg.src = exampleIconUrl as string;
+exampleImg.className = "icon";
+exampleP.append(exampleImg);
+
+document.body.append(title, canvas, tools, exampleP);
+
+// --- Interfaces ---
 interface Drawable {
   display(ctx: CanvasRenderingContext2D): void;
 }
@@ -22,16 +53,20 @@ interface Draggable {
   drag(x: number, y: number): void;
 }
 
+// --- Marker Tool ---
 class MarkerLine implements Drawable, Draggable {
-  points: { x: number; y: number }[] = [];
-  thickness: number;
+  private readonly points: { x: number; y: number }[];
+  private readonly thickness: number;
+
   constructor(x: number, y: number, thickness: number) {
     this.thickness = thickness;
-    this.points.push({ x, y });
+    this.points = [{ x, y }];
   }
+
   drag(x: number, y: number): void {
     this.points.push({ x, y });
   }
+
   display(ctx: CanvasRenderingContext2D): void {
     if (this.points.length < 2) return;
     ctx.beginPath();
@@ -46,15 +81,14 @@ class MarkerLine implements Drawable, Draggable {
   }
 }
 
+// --- Tool preview ---
 class ToolPreview implements Drawable {
-  x: number;
-  y: number;
-  thickness: number;
-  constructor(x: number, y: number, thickness: number) {
-    this.x = x;
-    this.y = y;
-    this.thickness = thickness;
-  }
+  constructor(
+    private readonly x: number,
+    private readonly y: number,
+    private readonly thickness: number,
+  ) {}
+
   display(ctx: CanvasRenderingContext2D): void {
     ctx.beginPath();
     ctx.strokeStyle = "gray";
@@ -65,15 +99,14 @@ class ToolPreview implements Drawable {
   }
 }
 
+// --- Stickers ---
 class StickerPreview implements Drawable {
-  x: number;
-  y: number;
-  sticker: string;
-  constructor(x: number, y: number, sticker: string) {
-    this.x = x;
-    this.y = y;
-    this.sticker = sticker;
-  }
+  constructor(
+    private readonly x: number,
+    private readonly y: number,
+    private readonly sticker: string,
+  ) {}
+
   display(ctx: CanvasRenderingContext2D): void {
     ctx.font = "24px serif";
     ctx.textAlign = "center";
@@ -83,18 +116,17 @@ class StickerPreview implements Drawable {
 }
 
 class StickerCommand implements Drawable, Draggable {
-  x: number;
-  y: number;
-  sticker: string;
-  constructor(x: number, y: number, sticker: string) {
-    this.x = x;
-    this.y = y;
-    this.sticker = sticker;
-  }
+  constructor(
+    private x: number,
+    private y: number,
+    private readonly sticker: string,
+  ) {}
+
   drag(x: number, y: number): void {
     this.x = x;
     this.y = y;
   }
+
   display(ctx: CanvasRenderingContext2D): void {
     ctx.font = "24px serif";
     ctx.textAlign = "center";
@@ -103,9 +135,16 @@ class StickerCommand implements Drawable, Draggable {
   }
 }
 
-const canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
-const context = canvas.getContext("2d")!;
+// --- Safe 2D context getter ---
+function get2DContext(canvasEl: HTMLCanvasElement): CanvasRenderingContext2D {
+  const context = canvasEl.getContext("2d");
+  if (!context) throw new Error("Unable to get 2D rendering context");
+  return context;
+}
 
+const ctx = get2DContext(canvas);
+
+// --- State ---
 type Command = MarkerLine | StickerCommand;
 type Preview = ToolPreview | StickerPreview;
 
@@ -118,19 +157,34 @@ let currentTool: "thin" | "thick" | "sticker" = "thin";
 let currentThickness = 1;
 let currentSticker = "";
 
-const thinButton = document.getElementById("thin") as HTMLButtonElement;
-const thickButton = document.getElementById("thick") as HTMLButtonElement;
-const sticker1 = document.getElementById("sticker1") as HTMLButtonElement;
-const sticker2 = document.getElementById("sticker2") as HTMLButtonElement;
-const sticker3 = document.getElementById("sticker3") as HTMLButtonElement;
+const availableStickers: string[] = ["😀", "🌸", "🚀"];
 
-function selectButton(button: HTMLButtonElement) {
-  document.querySelectorAll<HTMLButtonElement>("#tools button").forEach((b) =>
-    b.classList.remove("selectedTool")
-  );
+// --- Helpers ---
+function selectButton(button: HTMLButtonElement): void {
+  const all = tools.querySelectorAll<HTMLButtonElement>("button");
+  all.forEach((b) => b.classList.remove("selectedTool"));
   button.classList.add("selectedTool");
 }
 
+function renderStickerButtons(): void {
+  stickerButtonsDiv.innerHTML = "";
+  availableStickers.forEach((sticker) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = sticker;
+    btn.addEventListener("click", () => {
+      currentTool = "sticker";
+      currentSticker = sticker;
+      selectButton(btn);
+      canvas.dispatchEvent(new Event("tool-moved"));
+    });
+    stickerButtonsDiv.appendChild(btn);
+  });
+}
+
+renderStickerButtons();
+
+// --- Tool buttons ---
 thinButton.addEventListener("click", () => {
   currentTool = "thin";
   currentThickness = 1;
@@ -145,33 +199,23 @@ thickButton.addEventListener("click", () => {
   canvas.dispatchEvent(new Event("tool-moved"));
 });
 
-sticker1.addEventListener("click", () => {
-  currentTool = "sticker";
-  currentSticker = "😀";
-  selectButton(sticker1);
-  canvas.dispatchEvent(new Event("tool-moved"));
+addStickerButton.addEventListener("click", () => {
+  const maybe = prompt("Enter a new sticker (emoji or text):", "🙂");
+  if (!maybe) return;
+  const trimmed = maybe.trim();
+  if (trimmed.length === 0) return;
+  availableStickers.push(trimmed);
+  renderStickerButtons();
 });
 
-sticker2.addEventListener("click", () => {
-  currentTool = "sticker";
-  currentSticker = "🌸";
-  selectButton(sticker2);
-  canvas.dispatchEvent(new Event("tool-moved"));
-});
-
-sticker3.addEventListener("click", () => {
-  currentTool = "sticker";
-  currentSticker = "🚀";
-  selectButton(sticker3);
-  canvas.dispatchEvent(new Event("tool-moved"));
-});
-
-canvas.addEventListener("mousedown", (e: MouseEvent) => {
+// --- Pointer interactions ---
+canvas.addEventListener("mousedown", (ev) => {
   if (currentTool === "thin" || currentTool === "thick") {
-    currentCommand = new MarkerLine(e.offsetX, e.offsetY, currentThickness);
+    currentCommand = new MarkerLine(ev.offsetX, ev.offsetY, currentThickness);
   } else if (currentTool === "sticker" && currentSticker) {
-    currentCommand = new StickerCommand(e.offsetX, e.offsetY, currentSticker);
+    currentCommand = new StickerCommand(ev.offsetX, ev.offsetY, currentSticker);
   }
+
   if (currentCommand) {
     drawing.push(currentCommand);
     redoStack = [];
@@ -180,18 +224,21 @@ canvas.addEventListener("mousedown", (e: MouseEvent) => {
   }
 });
 
-canvas.addEventListener("mousemove", (e: MouseEvent) => {
+canvas.addEventListener("mousemove", (ev) => {
   if (currentCommand) {
-    currentCommand.drag(e.offsetX, e.offsetY);
+    currentCommand.drag(ev.offsetX, ev.offsetY);
     canvas.dispatchEvent(new Event("drawing-changed"));
-  } else {
-    if (currentTool === "thin" || currentTool === "thick") {
-      toolPreview = new ToolPreview(e.offsetX, e.offsetY, currentThickness);
-    } else if (currentTool === "sticker" && currentSticker) {
-      toolPreview = new StickerPreview(e.offsetX, e.offsetY, currentSticker);
-    }
-    canvas.dispatchEvent(new Event("tool-moved"));
+    return;
   }
+
+  if (currentTool === "thin" || currentTool === "thick") {
+    toolPreview = new ToolPreview(ev.offsetX, ev.offsetY, currentThickness);
+  } else if (currentTool === "sticker" && currentSticker) {
+    toolPreview = new StickerPreview(ev.offsetX, ev.offsetY, currentSticker);
+  } else {
+    toolPreview = null;
+  }
+  canvas.dispatchEvent(new Event("tool-moved"));
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -203,23 +250,30 @@ canvas.addEventListener("mouseleave", () => {
   canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
-function redraw() {
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  for (const cmd of drawing) cmd.display(context);
-  if (toolPreview) toolPreview.display(context);
+// --- Redraw ---
+function redraw(): void {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const cmd of drawing) cmd.display(ctx);
+  if (toolPreview) toolPreview.display(ctx);
 }
 
 canvas.addEventListener("drawing-changed", redraw);
 canvas.addEventListener("tool-moved", redraw);
 
+// --- Control buttons ---
 const buttonBar = document.createElement("div");
 buttonBar.style.marginTop = "1em";
 
 const clearButton = document.createElement("button");
+clearButton.type = "button";
 clearButton.textContent = "Clear";
+
 const undoButton = document.createElement("button");
+undoButton.type = "button";
 undoButton.textContent = "Undo";
+
 const redoButton = document.createElement("button");
+redoButton.type = "button";
 redoButton.textContent = "Redo";
 
 buttonBar.append(clearButton, undoButton, redoButton);
@@ -228,21 +282,17 @@ document.body.append(buttonBar);
 clearButton.addEventListener("click", () => {
   drawing = [];
   redoStack = [];
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
 
 undoButton.addEventListener("click", () => {
-  if (drawing.length > 0) {
-    const last = drawing.pop()!;
-    redoStack.push(last);
-    canvas.dispatchEvent(new Event("drawing-changed"));
-  }
+  const last = drawing.pop();
+  if (last) redoStack.push(last);
+  canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
 redoButton.addEventListener("click", () => {
-  if (redoStack.length > 0) {
-    const restored = redoStack.pop()!;
-    drawing.push(restored);
-    canvas.dispatchEvent(new Event("drawing-changed"));
-  }
+  const restored = redoStack.pop();
+  if (restored) drawing.push(restored);
+  canvas.dispatchEvent(new Event("drawing-changed"));
 });
