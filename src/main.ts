@@ -1,11 +1,10 @@
 import exampleIconUrl from "./noun-paperclip-7598668-00449F.png";
 import "./style.css";
 
-export {}; // ensure module scope
+export {};
 
-// --- DOM setup ---
 const title = document.createElement("h1");
-title.textContent = "Sticker Sketchpad";
+title.textContent = "🎨 Creative Sketchpad";
 
 const canvas = document.createElement("canvas");
 canvas.id = "myCanvas";
@@ -18,12 +17,12 @@ tools.id = "tools";
 const thinButton = document.createElement("button");
 thinButton.id = "thin";
 thinButton.type = "button";
-thinButton.textContent = "Thin Marker";
+thinButton.textContent = "✏️ Sketch Pen";
 
 const thickButton = document.createElement("button");
 thickButton.id = "thick";
 thickButton.type = "button";
-thickButton.textContent = "Thick Marker";
+thickButton.textContent = "🖌️ Paint Brush";
 
 const stickerButtonsDiv = document.createElement("div");
 stickerButtonsDiv.id = "stickerButtons";
@@ -44,33 +43,29 @@ exampleP.append(exampleImg);
 
 document.body.append(title, canvas, tools, exampleP);
 
-// --- Interfaces ---
 interface Drawable {
   display(ctx: CanvasRenderingContext2D): void;
 }
-
 interface Draggable {
   drag(x: number, y: number): void;
 }
 
-// --- Marker Tool ---
 class MarkerLine implements Drawable, Draggable {
   private readonly points: { x: number; y: number }[];
   private readonly thickness: number;
-
   constructor(x: number, y: number, thickness: number) {
     this.thickness = thickness;
     this.points = [{ x, y }];
   }
-
   drag(x: number, y: number): void {
     this.points.push({ x, y });
   }
-
   display(ctx: CanvasRenderingContext2D): void {
     if (this.points.length < 2) return;
     ctx.beginPath();
     ctx.strokeStyle = "black";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.lineWidth = this.thickness;
     ctx.moveTo(this.points[0].x, this.points[0].y);
     for (let i = 1; i < this.points.length; i++) {
@@ -81,14 +76,12 @@ class MarkerLine implements Drawable, Draggable {
   }
 }
 
-// --- Tool preview ---
 class ToolPreview implements Drawable {
   constructor(
     private readonly x: number,
     private readonly y: number,
     private readonly thickness: number,
   ) {}
-
   display(ctx: CanvasRenderingContext2D): void {
     ctx.beginPath();
     ctx.strokeStyle = "gray";
@@ -99,16 +92,14 @@ class ToolPreview implements Drawable {
   }
 }
 
-// --- Stickers ---
 class StickerPreview implements Drawable {
   constructor(
     private readonly x: number,
     private readonly y: number,
     private readonly sticker: string,
   ) {}
-
   display(ctx: CanvasRenderingContext2D): void {
-    ctx.font = "24px serif";
+    ctx.font = "36px serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(this.sticker, this.x, this.y);
@@ -121,21 +112,18 @@ class StickerCommand implements Drawable, Draggable {
     private y: number,
     private readonly sticker: string,
   ) {}
-
   drag(x: number, y: number): void {
     this.x = x;
     this.y = y;
   }
-
   display(ctx: CanvasRenderingContext2D): void {
-    ctx.font = "24px serif";
+    ctx.font = "36px serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(this.sticker, this.x, this.y);
   }
 }
 
-// --- Safe 2D context getter ---
 function get2DContext(canvasEl: HTMLCanvasElement): CanvasRenderingContext2D {
   const context = canvasEl.getContext("2d");
   if (!context) throw new Error("Unable to get 2D rendering context");
@@ -144,7 +132,6 @@ function get2DContext(canvasEl: HTMLCanvasElement): CanvasRenderingContext2D {
 
 const ctx = get2DContext(canvas);
 
-// --- State ---
 type Command = MarkerLine | StickerCommand;
 type Preview = ToolPreview | StickerPreview;
 
@@ -154,12 +141,11 @@ let currentCommand: Command | null = null;
 let toolPreview: Preview | null = null;
 
 let currentTool: "thin" | "thick" | "sticker" = "thin";
-let currentThickness = 1;
+let currentThickness = 2.5;
 let currentSticker = "";
 
-const availableStickers: string[] = ["😀", "🌸", "🚀"];
+const availableStickers: string[] = ["🎨", "🐾", "🌈", "⭐", "✨"];
 
-// --- Helpers ---
 function selectButton(button: HTMLButtonElement): void {
   const all = tools.querySelectorAll<HTMLButtonElement>("button");
   all.forEach((b) => b.classList.remove("selectedTool"));
@@ -184,23 +170,22 @@ function renderStickerButtons(): void {
 
 renderStickerButtons();
 
-// --- Tool buttons ---
 thinButton.addEventListener("click", () => {
   currentTool = "thin";
-  currentThickness = 1;
+  currentThickness = 2.5;
   selectButton(thinButton);
   canvas.dispatchEvent(new Event("tool-moved"));
 });
 
 thickButton.addEventListener("click", () => {
   currentTool = "thick";
-  currentThickness = 5;
+  currentThickness = 7;
   selectButton(thickButton);
   canvas.dispatchEvent(new Event("tool-moved"));
 });
 
 addStickerButton.addEventListener("click", () => {
-  const maybe = prompt("Enter a new sticker (emoji or text):", "🙂");
+  const maybe = prompt("Enter a new sticker (emoji or text):", "💡");
   if (!maybe) return;
   const trimmed = maybe.trim();
   if (trimmed.length === 0) return;
@@ -208,14 +193,12 @@ addStickerButton.addEventListener("click", () => {
   renderStickerButtons();
 });
 
-// --- Pointer interactions ---
 canvas.addEventListener("mousedown", (ev) => {
   if (currentTool === "thin" || currentTool === "thick") {
     currentCommand = new MarkerLine(ev.offsetX, ev.offsetY, currentThickness);
   } else if (currentTool === "sticker" && currentSticker) {
     currentCommand = new StickerCommand(ev.offsetX, ev.offsetY, currentSticker);
   }
-
   if (currentCommand) {
     drawing.push(currentCommand);
     redoStack = [];
@@ -230,7 +213,6 @@ canvas.addEventListener("mousemove", (ev) => {
     canvas.dispatchEvent(new Event("drawing-changed"));
     return;
   }
-
   if (currentTool === "thin" || currentTool === "thick") {
     toolPreview = new ToolPreview(ev.offsetX, ev.offsetY, currentThickness);
   } else if (currentTool === "sticker" && currentSticker) {
@@ -241,16 +223,12 @@ canvas.addEventListener("mousemove", (ev) => {
   canvas.dispatchEvent(new Event("tool-moved"));
 });
 
-canvas.addEventListener("mouseup", () => {
-  currentCommand = null;
-});
-
+canvas.addEventListener("mouseup", () => (currentCommand = null));
 canvas.addEventListener("mouseleave", () => {
   toolPreview = null;
   canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
-// --- Redraw ---
 function redraw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (const cmd of drawing) cmd.display(ctx);
@@ -260,26 +238,20 @@ function redraw(): void {
 canvas.addEventListener("drawing-changed", redraw);
 canvas.addEventListener("tool-moved", redraw);
 
-// --- Control buttons ---
 const buttonBar = document.createElement("div");
 buttonBar.style.marginTop = "1em";
 
 const clearButton = document.createElement("button");
-clearButton.type = "button";
-clearButton.textContent = "Clear";
+clearButton.textContent = "🧹 Clear";
 
 const undoButton = document.createElement("button");
-undoButton.type = "button";
-undoButton.textContent = "Undo";
+undoButton.textContent = "↩️ Undo";
 
 const redoButton = document.createElement("button");
-redoButton.type = "button";
-redoButton.textContent = "Redo";
+redoButton.textContent = "↪️ Redo";
 
-// ✅ NEW: Export button
 const exportButton = document.createElement("button");
-exportButton.type = "button";
-exportButton.textContent = "Export PNG";
+exportButton.textContent = "💾 Export PNG";
 
 buttonBar.append(clearButton, undoButton, redoButton, exportButton);
 document.body.append(buttonBar);
@@ -302,22 +274,16 @@ redoButton.addEventListener("click", () => {
   canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
-// ✅ --- High-resolution Export ---
 exportButton.addEventListener("click", () => {
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = 1024;
   exportCanvas.height = 1024;
-
   const exportCtx = get2DContext(exportCanvas);
-  exportCtx.scale(4, 4); // upscale by 4×
-
-  // Draw all commands (not previews)
+  exportCtx.scale(4, 4);
   for (const cmd of drawing) cmd.display(exportCtx);
-
-  // Export to PNG file
   const dataURL = exportCanvas.toDataURL("image/png");
   const link = document.createElement("a");
   link.href = dataURL;
-  link.download = "sketchpad_export.png";
+  link.download = "creative_sketchpad.png";
   link.click();
 });
